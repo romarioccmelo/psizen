@@ -181,13 +181,13 @@ const Index = () => {
   return (
     <div className="flex flex-col min-h-screen w-full bg-background">
       {/* Círculo centralizado */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
+      <div className="flex flex-col items-center justify-center p-4 pt-20">
         <AnimatedCircle status={status} />
         {renderErrorMessage()}
       </div>
 
       {/* Botão de microfone na parte inferior */}
-      <div className="w-full p-4 pb-20">
+      <div className="w-full p-4 pb-20 mt-auto">
         <div className="max-w-2xl mx-auto flex flex-col items-center">
           <div className="flex items-center gap-4">
             {messages.length > 0 && (
