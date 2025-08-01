@@ -187,7 +187,7 @@ const Index = () => {
       </div>
 
       {/* Botão de microfone na parte inferior */}
-      <div className="w-full p-4 pb-20 mt-auto">
+      <div className="w-full p-4 pb-32 mt-auto">
         <div className="max-w-2xl mx-auto flex flex-col items-center">
           <div className="flex items-center gap-4">
             {messages.length > 0 && (
