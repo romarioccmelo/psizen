@@ -22,6 +22,7 @@ const Index = () => {
   } = useConversationContext()
 
   const [isRecording, setIsRecording] = useState(false)
+  const [isSupported, setIsSupported] = useState(true)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const { toast } = useToast()
@@ -35,16 +36,74 @@ const Index = () => {
     scrollToBottom()
   }, [messages])
 
+  // Verificar compatibilidade do navegador
+  useEffect(() => {
+    const checkSupport = () => {
+      const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+      const hasMediaRecorder = !!window.MediaRecorder
+      const hasAudioContext = !!window.AudioContext
+      
+      if (!hasMediaDevices || !hasMediaRecorder || !hasAudioContext) {
+        setIsSupported(false)
+        toast({
+          variant: 'destructive',
+          title: 'Navegador não suportado',
+          description: 'Seu navegador não suporta gravação de áudio. Use Chrome, Firefox ou Safari.',
+        })
+        return false
+      }
+      return true
+    }
+
+    checkSupport()
+  }, [toast])
+
   const getPermission = useCallback(async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Verificar se já temos permissão
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100
+        } 
+      })
+      
+      // Parar o stream imediatamente após verificar permissão
+      stream.getTracks().forEach(track => track.stop())
       return true
     } catch (err) {
       console.error('Error getting microphone permission:', err)
+      
+      let errorMessage = 'Não foi possível acessar o microfone.'
+      
+      if (err instanceof DOMException) {
+        switch (err.name) {
+          case 'NotAllowedError':
+            errorMessage = 'Permissão para microfone foi negada. Por favor, permita o acesso ao microfone nas configurações do seu navegador.'
+            break
+          case 'NotFoundError':
+            errorMessage = 'Nenhum microfone encontrado. Verifique se há um microfone conectado.'
+            break
+          case 'NotSupportedError':
+            errorMessage = 'Seu navegador não suporta gravação de áudio.'
+            break
+          default:
+            errorMessage = `Erro de permissão: ${err.message}`
+        }
+      }
+      
+      toast({
+        variant: 'destructive',
+        title: 'Erro de Microfone',
+        description: errorMessage,
+      })
+      
       setStatus('error')
       return false
     }
-  }, [setStatus])
+  }, [setStatus, toast])
 
   const startRecording = useCallback(async () => {
     try {
