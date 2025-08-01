@@ -1,0 +1,29 @@
+<svg width="32" height="32" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Círculo principal -->
+  <circle cx="256" cy="256" r="240" fill="url(#gradient)" stroke="url(#strokeGradient)" stroke-width="8"/>
+  
+  <!-- Círculos internos abstratos -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
+  <circle cx="256" cy="256" r="120" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+  <circle cx="256" cy="256" r="60" fill="rgba(255,255,255,0.1)"/>
+  
+  <!-- Elementos decorativos -->
+  <circle cx="200" cy="200" r="20" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="312" cy="200" r="15" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="200" cy="312" r="12" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="312" cy="312" r="18" fill="rgba(255,255,255,0.35)"/>
+  
+  <!-- Gradientes -->
+  <defs>
+    <radialGradient id="gradient" cx="0.3" cy="0.3" r="0.8">
+      <stop offset="0%" stop-color="#0066FF"/>
+      <stop offset="70%" stop-color="#4DA6FF"/>
+      <stop offset="100%" stop-color="#0066FF"/>
+    </radialGradient>
+    
+    <linearGradient id="strokeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+</svg> 
