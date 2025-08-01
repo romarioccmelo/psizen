@@ -186,8 +186,8 @@ const Index = () => {
         {renderErrorMessage()}
       </div>
 
-      {/* Botão de microfone na parte inferior */}
-      <div className="w-full p-4 pb-50 mt-auto">
+      {/* Botão de microfone 150px abaixo do círculo */}
+      <div className="w-full p-4" style={{ marginTop: '150px' }}>
         <div className="max-w-2xl mx-auto flex flex-col items-center">
           <div className="flex items-center gap-4">
             {messages.length > 0 && (
