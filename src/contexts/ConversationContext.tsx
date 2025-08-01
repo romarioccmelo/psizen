@@ -19,6 +19,7 @@ type ConversationContextType = {
   playAudio: (url: string) => void
   retryLastMessage: () => void
   clearConversation: () => void
+  forceUserInteraction: () => void
 }
 
 const ConversationContext = createContext<ConversationContextType | null>(null)
@@ -206,8 +207,10 @@ const useConversation = (): ConversationContextType => {
   const [messages, setMessages] = useState<Message[]>([])
   const [status, setStatus] = useState<InteractionStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [needsAudioPermission, setNeedsAudioPermission] = useState(false)
   const audioPlayer = useRef<HTMLAudioElement | null>(null)
   const lastUserAudioBlob = useRef<Blob | null>(null)
+  const pendingAudioUrl = useRef<string | null>(null)
 
   useEffect(() => {
     audioPlayer.current = new Audio()
@@ -216,9 +219,47 @@ const useConversation = (): ConversationContextType => {
     audioPlayer.current.preload = 'auto'
     audioPlayer.current.crossOrigin = 'anonymous'
     
+    // Marcar que o usuário interagiu quando tocar na tela
+    const handleUserInteraction = async () => {
+      console.log('Usuário interagiu com a página')
+      
+      try {
+        // Tentar reproduzir um áudio silencioso para ativar o contexto
+        const silentAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeQ==')
+        silentAudio.volume = 0
+        await silentAudio.play()
+        console.log('Contexto de áudio ativado com sucesso!')
+      } catch (error) {
+        console.log('Não foi possível ativar contexto de áudio:', error)
+      }
+      
+      setNeedsAudioPermission(false)
+      // Remover os listeners após a primeira interação
+      document.removeEventListener('touchstart', handleUserInteraction)
+      document.removeEventListener('click', handleUserInteraction)
+      document.removeEventListener('keydown', handleUserInteraction)
+      
+      // Se há um áudio pendente, tentar reproduzir
+      if (pendingAudioUrl.current) {
+        console.log('Tentando reproduzir áudio pendente após interação:', pendingAudioUrl.current)
+        setTimeout(() => {
+          playAudio(pendingAudioUrl.current!)
+          pendingAudioUrl.current = null
+        }, 200)
+      }
+    }
+    
+    // Adicionar listeners para detectar interação do usuário
+    document.addEventListener('touchstart', handleUserInteraction, { once: true })
+    document.addEventListener('click', handleUserInteraction, { once: true })
+    document.addEventListener('keydown', handleUserInteraction, { once: true })
+    
     return () => {
       audioPlayer.current?.pause()
       audioPlayer.current = null
+      document.removeEventListener('touchstart', handleUserInteraction)
+      document.removeEventListener('click', handleUserInteraction)
+      document.removeEventListener('keydown', handleUserInteraction)
     }
   }, [])
 
@@ -260,7 +301,31 @@ const useConversation = (): ConversationContextType => {
           console.error('Detalhes do erro:', audioPlayer.current?.error)
           console.error('Código do erro:', audioPlayer.current?.error?.code)
           console.error('Mensagem do erro:', audioPlayer.current?.error?.message)
-          setError('Não foi possível reproduzir o áudio.')
+          
+          // Criar mensagem de erro detalhada
+          let errorMessage = 'Não foi possível reproduzir o áudio.'
+          
+          if (audioPlayer.current?.error) {
+            const error = audioPlayer.current.error
+            switch (error.code) {
+              case MediaError.MEDIA_ERR_ABORTED:
+                errorMessage = 'Reprodução foi interrompida pelo usuário.'
+                break
+              case MediaError.MEDIA_ERR_NETWORK:
+                errorMessage = 'Erro de rede ao carregar o áudio.'
+                break
+              case MediaError.MEDIA_ERR_DECODE:
+                errorMessage = 'Formato de áudio não suportado pelo navegador.'
+                break
+              case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
+                errorMessage = 'Fonte de áudio não suportada.'
+                break
+              default:
+                errorMessage = `Erro de áudio: ${error.message || 'Erro desconhecido'}`
+            }
+          }
+          
+          setError(errorMessage)
           setStatus('error')
           // Limpar URL do blob em caso de erro
           if (audioPlayer.current && audioPlayer.current.src.startsWith('blob:')) {
@@ -277,12 +342,25 @@ const useConversation = (): ConversationContextType => {
             console.error('Tipo de erro:', e.name)
             console.error('Mensagem:', e.message)
             
+            if (e.name === 'NotAllowedError') {
+              setError('Toque na tela primeiro para permitir reprodução de áudio.')
+              setStatus('error')
+              // Guardar a URL para tentar reproduzir depois
+              pendingAudioUrl.current = url
+              return
+            }
+            
             // Tentar reproduzir novamente após um delay (comum em mobile)
             setTimeout(() => {
               if (audioPlayer.current) {
                 audioPlayer.current.play().catch((retryError) => {
                   console.error('Erro na segunda tentativa:', retryError)
-                  setError('Não foi possível reproduzir o áudio.')
+                  if (retryError.name === 'NotAllowedError') {
+                    setError('Toque na tela primeiro para permitir reprodução de áudio.')
+                    pendingAudioUrl.current = url
+                  } else {
+                    setError(`Falha na reprodução: ${retryError.name} - ${retryError.message}`)
+                  }
                   setStatus('error')
                 })
               }
@@ -329,6 +407,9 @@ const useConversation = (): ConversationContextType => {
 
         const fileInfo = result[0]
         console.log('Informações completas da resposta:', fileInfo)
+        console.log('Tipo de dados:', typeof fileInfo.data)
+        console.log('Tamanho dos dados:', fileInfo.data ? fileInfo.data.length : 'undefined')
+        console.log('MIME type:', fileInfo.mimeType)
 
         // Verificar se o áudio já está na resposta inicial
         if (fileInfo.data && typeof fileInfo.data === 'string') {
@@ -343,6 +424,8 @@ const useConversation = (): ConversationContextType => {
             return
           } catch (base64Error) {
             console.error('Erro ao processar base64:', base64Error)
+            setError(`Erro ao processar áudio: ${base64Error instanceof Error ? base64Error.message : 'Erro desconhecido'}`)
+            setStatus('error')
           }
         }
 
@@ -362,10 +445,20 @@ const useConversation = (): ConversationContextType => {
         } catch (audioError) {
           console.error('Erro ao buscar áudio:', audioError)
           
-          // Se não conseguir buscar o áudio, simular fala
-          console.log('Simulando fala por 3 segundos...')
-          setStatus('speaking')
-          setTimeout(() => setStatus('idle'), 3000)
+          // Mostrar erro específico
+          const errorMessage = audioError instanceof Error 
+            ? audioError.message 
+            : 'Erro desconhecido ao buscar áudio'
+          
+          setError(`Erro ao buscar áudio: ${errorMessage}`)
+          setStatus('error')
+          
+          // Se não conseguir buscar o áudio, simular fala após 3 segundos
+          setTimeout(() => {
+            console.log('Simulando fala por 3 segundos...')
+            setStatus('speaking')
+            setTimeout(() => setStatus('idle'), 3000)
+          }, 3000)
         }
       } catch (e) {
         console.error('Error sending audio to webhook:', e)
@@ -395,7 +488,58 @@ const useConversation = (): ConversationContextType => {
     setStatus('idle')
     setError(null)
     lastUserAudioBlob.current = null
+    pendingAudioUrl.current = null
   }, [])
+
+  // Função para forçar interação do usuário
+  const forceUserInteraction = useCallback(async () => {
+    console.log('Forçando interação do usuário...')
+    
+    if (!audioPlayer.current) {
+      console.error('AudioPlayer não está disponível')
+      return
+    }
+    
+    try {
+      // Criar um áudio de teste silencioso para "despertar" o contexto de áudio
+      const silentAudio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmccDDuO1fPOeQ==')
+      silentAudio.volume = 0
+      
+      console.log('Tentando reproduzir áudio silencioso para ativar contexto...')
+      await silentAudio.play()
+      console.log('Áudio silencioso reproduzido com sucesso!')
+      
+      // Marcar que o usuário interagiu
+      setNeedsAudioPermission(false)
+      setError(null)
+      setStatus('idle')
+      
+      // Se há um áudio pendente, tentar reproduzir
+      if (pendingAudioUrl.current) {
+        console.log('Tentando reproduzir áudio pendente:', pendingAudioUrl.current)
+        setTimeout(() => {
+          playAudio(pendingAudioUrl.current!)
+          pendingAudioUrl.current = null
+        }, 200)
+      }
+      
+    } catch (error) {
+      console.error('Erro ao forçar interação:', error)
+      
+      // Fallback: apenas marcar como interagido e tentar reproduzir
+      setNeedsAudioPermission(false)
+      setError(null)
+      setStatus('idle')
+      
+      if (pendingAudioUrl.current) {
+        console.log('Fallback: Tentando reproduzir áudio pendente:', pendingAudioUrl.current)
+        setTimeout(() => {
+          playAudio(pendingAudioUrl.current!)
+          pendingAudioUrl.current = null
+        }, 200)
+      }
+    }
+  }, [playAudio])
 
   return {
     messages,
@@ -406,6 +550,7 @@ const useConversation = (): ConversationContextType => {
     playAudio,
     retryLastMessage,
     clearConversation,
+    forceUserInteraction,
   }
 }
 

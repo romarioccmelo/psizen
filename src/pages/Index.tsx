@@ -179,41 +179,43 @@ const Index = () => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full items-center justify-between p-4 space-y-4 bg-background">
-      {/* Círculo sempre visível no centro */}
-      <div className="flex-grow flex flex-col items-center justify-center w-full">
+    <div className="flex flex-col h-full w-full bg-background">
+      {/* Círculo centralizado */}
+      <div className="flex-1 flex flex-col items-center justify-center p-4">
         <AnimatedCircle status={status} />
         {renderErrorMessage()}
       </div>
 
-      {/* Botão de microfone na parte inferior */}
-      <div className="w-full max-w-2xl flex flex-col items-center space-y-4">
-        <div className="flex items-center gap-4">
-          {messages.length > 0 && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={clearConversation}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="h-5 w-5" />
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="lg"
-            className={cn(
-              'w-16 h-16 md:w-20 md:h-20 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 border-2',
-              status === 'recording'
-                ? 'border-secondary text-secondary hover:bg-secondary/10'
-                : 'border-primary text-primary hover:bg-primary/10',
+      {/* Botão de microfone fixo no fundo */}
+      <div className="w-full p-4 pb-8">
+        <div className="max-w-2xl mx-auto flex flex-col items-center">
+          <div className="flex items-center gap-4">
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={clearConversation}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
             )}
-            onClick={handleMicClick}
-            disabled={status === 'processing' || status === 'speaking'}
-          >
-            <Mic className="h-8 w-8 md:h-10 md:w-10" />
-          </Button>
-          {messages.length > 0 && <div className="w-10" />}
+            <Button
+              variant="outline"
+              size="lg"
+              className={cn(
+                'w-16 h-16 md:w-20 md:h-20 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 active:scale-95 border-2 touch-manipulation',
+                status === 'recording'
+                  ? 'border-secondary text-secondary hover:bg-secondary/10'
+                  : 'border-primary text-primary hover:bg-primary/10',
+              )}
+              onClick={handleMicClick}
+              disabled={status === 'processing' || status === 'speaking'}
+            >
+              <Mic className="h-8 w-8 md:h-10 md:w-10" />
+            </Button>
+            {messages.length > 0 && <div className="w-10" />}
+          </div>
         </div>
       </div>
     </div>
