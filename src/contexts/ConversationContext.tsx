@@ -26,19 +26,57 @@ const ConversationContext = createContext<ConversationContextType | null>(null)
 const WEBHOOK_URL =
   'https://workflow.usecurling.com/webhook/acd69b0c-3697-40dd-97d4-75f7b96c2c21'
 
-// Função para converter base64 para blob
+// Função melhorada para converter base64 para blob
 const base64ToBlob = (base64: string, mimeType: string): Blob => {
-  const byteCharacters = atob(base64)
-  const byteNumbers = new Array(byteCharacters.length)
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i)
+  try {
+    // Remover possíveis prefixos de data URL
+    const base64Data = base64.replace(/^data:audio\/[^;]+;base64,/, '')
+    
+    const byteCharacters = atob(base64Data)
+    const byteNumbers = new Array(byteCharacters.length)
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i)
+    }
+    const byteArray = new Uint8Array(byteNumbers)
+    
+    // Verificar se o MIME type é suportado no mobile
+    const supportedTypes = ['audio/mp3', 'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/webm']
+    const finalMimeType = supportedTypes.includes(mimeType) ? mimeType : 'audio/mp3'
+    
+    console.log('Criando blob com MIME type:', finalMimeType)
+    return new Blob([byteArray], { type: finalMimeType })
+  } catch (error) {
+    console.error('Erro ao converter base64 para blob:', error)
+    throw new Error('Formato de áudio inválido')
   }
-  const byteArray = new Uint8Array(byteNumbers)
-  return new Blob([byteArray], { type: mimeType })
+}
+
+// Função para verificar compatibilidade de áudio
+const checkAudioSupport = () => {
+  const audio = new Audio()
+  const supportedTypes = [
+    'audio/mp3',
+    'audio/mpeg', 
+    'audio/wav',
+    'audio/ogg',
+    'audio/webm'
+  ]
+  
+  const supported = supportedTypes.filter(type => {
+    try {
+      return audio.canPlayType(type) !== ''
+    } catch {
+      return false
+    }
+  })
+  
+  console.log('Formatos de áudio suportados:', supported)
+  return supported
 }
 
 // Função para tentar diferentes métodos de obtenção do áudio
 const getAudioFromServer = async (fileName: string, originalAudioBlob: Blob): Promise<Blob | null> => {
+  const supportedTypes = checkAudioSupport()
   const methods = [
     // Método 1: Tentar webhook com parâmetros específicos para obter base64
     async () => {
@@ -173,6 +211,11 @@ const useConversation = (): ConversationContextType => {
 
   useEffect(() => {
     audioPlayer.current = new Audio()
+    
+    // Configurar para mobile
+    audioPlayer.current.preload = 'auto'
+    audioPlayer.current.crossOrigin = 'anonymous'
+    
     return () => {
       audioPlayer.current?.pause()
       audioPlayer.current = null
@@ -188,11 +231,18 @@ const useConversation = (): ConversationContextType => {
         audioPlayer.current.pause()
       } else {
         console.log('Configurando novo áudio...')
+        
+        // Limpar URL anterior se for blob
+        if (audioPlayer.current.src.startsWith('blob:')) {
+          URL.revokeObjectURL(audioPlayer.current.src)
+        }
+        
         audioPlayer.current.src = url
         
         // Adicionar event listeners para debug
         audioPlayer.current.onloadstart = () => console.log('Áudio começando a carregar...')
         audioPlayer.current.oncanplay = () => console.log('Áudio pronto para tocar...')
+        audioPlayer.current.oncanplaythrough = () => console.log('Áudio pode tocar completamente...')
         audioPlayer.current.onplay = () => {
           console.log('Áudio começou a tocar!')
           setStatus('speaking')
@@ -208,6 +258,8 @@ const useConversation = (): ConversationContextType => {
         audioPlayer.current.onerror = (e) => {
           console.error('Erro ao tocar áudio:', e)
           console.error('Detalhes do erro:', audioPlayer.current?.error)
+          console.error('Código do erro:', audioPlayer.current?.error?.code)
+          console.error('Mensagem do erro:', audioPlayer.current?.error?.message)
           setError('Não foi possível reproduzir o áudio.')
           setStatus('error')
           // Limpar URL do blob em caso de erro
@@ -216,11 +268,27 @@ const useConversation = (): ConversationContextType => {
           }
         }
         
-        audioPlayer.current.play().catch((e) => {
-          console.error('Erro ao iniciar reprodução:', e)
-          setError('Não foi possível reproduzir o áudio.')
-          setStatus('error')
-        })
+        // Tentar reproduzir com tratamento de erro melhorado
+        const playPromise = audioPlayer.current.play()
+        
+        if (playPromise !== undefined) {
+          playPromise.catch((e) => {
+            console.error('Erro ao iniciar reprodução:', e)
+            console.error('Tipo de erro:', e.name)
+            console.error('Mensagem:', e.message)
+            
+            // Tentar reproduzir novamente após um delay (comum em mobile)
+            setTimeout(() => {
+              if (audioPlayer.current) {
+                audioPlayer.current.play().catch((retryError) => {
+                  console.error('Erro na segunda tentativa:', retryError)
+                  setError('Não foi possível reproduzir o áudio.')
+                  setStatus('error')
+                })
+              }
+            }, 100)
+          })
+        }
       }
     } else {
       console.error('audioPlayer não está disponível')
